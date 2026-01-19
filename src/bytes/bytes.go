@@ -246,16 +246,35 @@ func IndexAny(s []byte, chars string) int {
 		}
 		return IndexRune(s, r)
 	}
-	if len(s) > 8 {
-		if as, isASCII := makeASCIISet(chars); isASCII {
-			for i, c := range s {
-				if as.contains(c) {
-					return i
-				}
-			}
-			return -1
+
+	// For large buffers (>=128 bytes), use architecture-specific optimizations
+	// For small buffers, use proven bitset approach to avoid any regression
+	if len(s) >= 128 {
+		// IndexAnyASCII checks for ASCII during lookup structure build
+		// and returns -2 if non-ASCII is detected
+		if result := bytealg.IndexAnyASCII(s, chars); result != -2 {
+			return result
 		}
+		// Non-ASCII detected - fall through to UTF-8 path below
 	}
+
+	// Small buffer (<128 bytes) or non-ASCII charset
+	// Use original proven bitset approach (no regression)
+	if as, isASCII := makeASCIISet(chars); isASCII {
+		for i, c := range s {
+			if as.contains(c) {
+				return i
+			}
+		}
+		return -1
+	}
+
+	// Non-ASCII charset, use UTF-8 decoder
+	return indexAnyUTF8(s, chars)
+}
+
+// indexAnyUTF8 is the UTF-8 decoder path for non-ASCII charsets
+func indexAnyUTF8(s []byte, chars string) int {
 	var width int
 	for i := 0; i < len(s); i += width {
 		r := rune(s[i])
