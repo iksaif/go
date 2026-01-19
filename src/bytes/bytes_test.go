@@ -2499,3 +2499,235 @@ func TestClone(t *testing.T) {
 		}
 	}
 }
+
+// ============================================================================
+// Comprehensive IndexAny Tests - ARM64 NEON Optimization
+// ============================================================================
+
+func TestIndexAnyComprehensive(t *testing.T) {
+	tests := []struct {
+		name     string
+		s        string
+		chars    string
+		expected int
+	}{
+		// ASCII tests
+		{"simple match", "Hello, World!", "aeiou", 1},
+		{"not found", "HELLO WORLD", "aeiou", -1},
+		{"first byte", "aello", "aeiou", 0},
+		{"last byte", "Hxlla", "aeiou", 4},
+		{"single char", "hello", "l", 2},
+		{"digits", "test 123", "0123456789", 5},
+		{"whitespace", "hello\tworld", " \t\n\r", 5},
+
+		// Empty cases
+		{"empty string", "", "aeiou", -1},
+		{"empty charset", "hello", "", -1},
+		{"both empty", "", "", -1},
+
+		// Single byte cases
+		{"single byte match", "a", "a", 0},
+		{"single byte no match", "a", "b", -1},
+
+		// UTF-8 tests
+		{"UTF-8: find ASCII in UTF-8", "Hello 世界", "o", 4},
+		{"UTF-8: find multibyte char", "Hello 世界", "世", 6},
+		{"UTF-8: multiple multibyte", "こんにちは", "に", 6},
+		{"UTF-8: emoji", "Hello 👋 World", "👋", 6},
+		{"UTF-8: mixed", "test测试", "测", 4},
+		{"UTF-8: not found", "Hello World", "世", -1},
+		{"UTF-8: 2-byte char", "hello café", "é", 9},
+
+		// Edge cases
+		{"all match", "aaaaa", "a", 0},
+		{"match at end", "xxxxxe", "aeiou", 5},
+		{"large charset", "test@example.com", "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ", 0},
+		
+		// Realistic patterns
+		{"CSV parsing", "john,doe,30", ",", 4},
+		{"JSON parsing", `{"key":"value"}`, ":", 6},
+		{"URL parsing", "https://example.com", ":/", 5},
+		{"Log parsing", "2024-01-15 ERROR", "IEDW", 11}, // ERROR
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := []byte(tt.s)
+			result := IndexAny(s, tt.chars)
+			if result != tt.expected {
+				t.Errorf("IndexAny(%q, %q) = %d, want %d",
+					tt.s, tt.chars, result, tt.expected)
+			}
+		})
+	}
+}
+
+// ============================================================================
+// Realistic Workload Benchmarks
+// ============================================================================
+
+func BenchmarkIndexAnyRealisticWorkloads(b *testing.B) {
+	workloads := []struct {
+		name  string
+		data  string
+		chars string
+	}{
+		{"CSV_parsing", "john,doe,30,engineer\njane,smith,28,designer\n", ",\n"},
+		{"JSON_parsing", `{"name":"John","age":30,"city":"New York"}`, "{}[]:,\""},
+		{"Log_parsing", "2024-01-15 10:30:45 INFO Starting application\n", "IEDW"},
+		{"URL_parsing", "https://example.com/api/users?id=123", ":/?#[]@"},
+		{"Whitespace_split", "Hello world\tthis is a test\n", " \t\n\r"},
+		{"Vowel_search", "The quick brown fox jumps over the lazy dog", "aeiouAEIOU"},
+	}
+
+	for _, wl := range workloads {
+		data := []byte(wl.data)
+		b.Run(wl.name, func(b *testing.B) {
+			b.SetBytes(int64(len(data)))
+			for i := 0; i < b.N; i++ {
+				IndexAny(data, wl.chars)
+			}
+		})
+	}
+}
+
+// ============================================================================
+// Charset Size Benchmarks (measure impact of charset size)
+// ============================================================================
+
+func BenchmarkIndexAnyCharsetSize(b *testing.B) {
+	charsets := []struct {
+		name  string
+		chars string
+	}{
+		{"2bytes_delim", ",\n"},
+		{"4bytes_space", " \t\n\r"},
+		{"5bytes_vowels", "aeiou"},
+		{"6bytes_levels", "DIEWTF"},
+		{"10bytes_digits", "0123456789"},
+		{"16bytes_hex", "0123456789abcdef"},
+		{"62bytes_alnum", "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"},
+	}
+
+	sizes := []int{16, 64, 256, 1024, 16384, 1048576}
+
+	for _, cs := range charsets {
+		for _, size := range sizes {
+			// Worst case: match at end
+			buf := make([]byte, size)
+			for i := range buf {
+				buf[i] = 0xFF
+			}
+			if size > 0 {
+				buf[size-1] = cs.chars[0]
+			}
+
+			name := fmt.Sprintf("%s/buf%d", cs.name, size)
+			b.Run(name, func(b *testing.B) {
+				b.SetBytes(int64(size))
+				for i := 0; i < b.N; i++ {
+					IndexAny(buf, cs.chars)
+				}
+			})
+		}
+	}
+}
+
+// ============================================================================
+// Match Position Impact (early vs late matches)
+// ============================================================================
+
+func BenchmarkIndexAnyMatchPosition(b *testing.B) {
+	chars := "aeiou"
+	size := 1024
+
+	positions := []struct {
+		name string
+		pos  int // -1 means no match
+	}{
+		{"match_start", 0},
+		{"match_quarter", size / 4},
+		{"match_half", size / 2},
+		{"match_end", size - 1},
+		{"no_match", -1},
+	}
+
+	for _, p := range positions {
+		buf := make([]byte, size)
+		for i := range buf {
+			buf[i] = 'x'
+		}
+		if p.pos >= 0 {
+			buf[p.pos] = 'e'
+		}
+
+		b.Run(p.name, func(b *testing.B) {
+			b.SetBytes(int64(size))
+			for i := 0; i < b.N; i++ {
+				IndexAny(buf, chars)
+			}
+		})
+	}
+}
+
+// ============================================================================
+// NEON Threshold Analysis
+// ============================================================================
+
+func BenchmarkIndexAnyNEONThreshold(b *testing.B) {
+	chars := "aeiou"
+	
+	// Test sizes around the 128-byte threshold where NEON kicks in
+	sizes := []int{8, 16, 32, 64, 96, 128, 160, 192, 256, 512}
+
+	for _, size := range sizes {
+		buf := make([]byte, size)
+		for i := range buf {
+			buf[i] = 'x'
+		}
+		if size > 0 {
+			buf[size-1] = 'e'
+		}
+
+		b.Run(fmt.Sprintf("size%d", size), func(b *testing.B) {
+			b.SetBytes(int64(size))
+			for i := 0; i < b.N; i++ {
+				IndexAny(buf, chars)
+			}
+		})
+	}
+}
+
+// ============================================================================
+// Large Buffer Performance (1MB)
+// ============================================================================
+
+func BenchmarkIndexAny1MB(b *testing.B) {
+	bufSize := 1048576
+	charsets := []struct {
+		name  string
+		chars string
+	}{
+		{"2bytes", "ab"},
+		{"5bytes", "aeiou"},
+		{"10bytes", "0123456789"},
+		{"16bytes", "0123456789abcdef"},
+		{"62bytes", "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"},
+	}
+
+	for _, cs := range charsets {
+		buf := make([]byte, bufSize)
+		for i := range buf {
+			buf[i] = 0xFF
+		}
+		buf[bufSize-1] = cs.chars[0]
+
+		b.Run(cs.name, func(b *testing.B) {
+			b.SetBytes(int64(bufSize))
+			b.ReportMetric(float64(len(cs.chars)), "charset_bytes")
+			for i := 0; i < b.N; i++ {
+				IndexAny(buf, cs.chars)
+			}
+		})
+	}
+}
