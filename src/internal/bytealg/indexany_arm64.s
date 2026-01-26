@@ -40,7 +40,7 @@
 //   3. Compare each byte against charset using unrolled comparisons
 //   4. Return first match position
 //
-TEXT ·indexanyNeonUnrolled<ABIInternal>(SB), NOSPLIT, $32-48
+TEXT ·indexanyASCIINeonUnrolled<ABIInternal>(SB), NOSPLIT, $32-48
 	// Registers (ABIInternal calling convention):
 	//   R0 = s.data
 	//   R1 = s.len
@@ -361,7 +361,7 @@ unrolled_not_found:
 //   2. Use unrolled scalar lookups for search (optimized for ARM64 cache)
 //   3. Return first match position
 //
-TEXT ·indexanyNeonLookup<ABIInternal>(SB), NOSPLIT, $256-48
+TEXT ·indexanyASCIINeonLookup<ABIInternal>(SB), NOSPLIT, $256-48
 	// Registers (ABIInternal calling convention):
 	//   R0 = s.data
 	//   R1 = s.len

@@ -35,5 +35,5 @@ func IndexAnyASCII(s []byte, chars string) int {
 	}
 
 	// For larger charsets, use shared lookup table implementation
-	return indexanyScalarLookup(s, chars)
+	return indexanyASCIILookup(s, chars)
 }

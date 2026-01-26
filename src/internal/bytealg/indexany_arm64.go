@@ -25,24 +25,24 @@ func IndexAnyASCII(s []byte, chars string) int {
 	if len(chars) <= 5 {
 		// Small charset: Use NEON unrolled comparisons
 		// Best for 2-5 byte charsets
-		return indexanyNeonUnrolled(s, chars)
+		return indexanyASCIINeonUnrolled(s, chars)
 	} else if len(chars) <= 16 {
 		// Medium charset: Scalar lookup is faster than NEON unrolled
-		return indexanyScalarLookup(s, chars)
+		return indexanyASCIILookup(s, chars)
 	} else {
 		// Large charset: Use NEON lookup table approach
-		return indexanyNeonLookup(s, chars)
+		return indexanyASCIINeonLookup(s, chars)
 	}
 }
 
-// indexanyNeonUnrolled is implemented in indexany_arm64.s
+// indexanyASCIINeonUnrolled is implemented in indexany_arm64.s
 // Uses unrolled NEON comparisons for small charsets (≤5 bytes)
 //
 //go:noescape
-func indexanyNeonUnrolled(s []byte, chars string) int
+func indexanyASCIINeonUnrolled(s []byte, chars string) int
 
-// indexanyNeonLookup is implemented in indexany_arm64.s
+// indexanyASCIINeonLookup is implemented in indexany_arm64.s
 // Uses 256-byte lookup table for large charsets (>16 bytes)
 //
 //go:noescape
-func indexanyNeonLookup(s []byte, chars string) int
+func indexanyASCIINeonLookup(s []byte, chars string) int
