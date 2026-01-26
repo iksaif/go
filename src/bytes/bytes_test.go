@@ -2548,15 +2548,42 @@ func TestIndexAnyComprehensive(t *testing.T) {
 		{"Log parsing", "2024-01-15 ERROR", "IEDW", 11}, // ERROR
 	}
 
+	// Test with original sizes and with larger buffers because the implementation might depend on size
+	bufferSizes := []struct {
+		name   string
+		padLen int
+	}{
+		{"small", 0},    // original size
+		{"medium", 128}, // pad to 128 bytes
+		{"large", 512},  // pad to 512 bytes
+	}
+
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := []byte(tt.s)
-			result := IndexAny(s, tt.chars)
-			if result != tt.expected {
-				t.Errorf("IndexAny(%q, %q) = %d, want %d",
-					tt.s, tt.chars, result, tt.expected)
+		for _, bs := range bufferSizes {
+			testName := tt.name
+			if bs.padLen > 0 {
+				testName = tt.name + "/" + bs.name
 			}
-		})
+			t.Run(testName, func(t *testing.T) {
+				s := []byte(tt.s)
+				expected := tt.expected
+
+				// Pad buffer if needed
+				if bs.padLen > 0 && len(s) < bs.padLen {
+					padding := make([]byte, bs.padLen-len(s))
+					for i := range padding {
+						padding[i] = 'z' // Use 'z' which won't match most test charsets
+					}
+					s = append(s, padding...)
+				}
+
+				result := IndexAny(s, tt.chars)
+				if result != expected {
+					t.Errorf("IndexAny(%q..., %q) = %d, want %d",
+						tt.s, tt.chars, result, expected)
+				}
+			})
+		}
 	}
 }
 
