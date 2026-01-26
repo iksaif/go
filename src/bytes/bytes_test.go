@@ -2500,10 +2500,8 @@ func TestClone(t *testing.T) {
 	}
 }
 
-// ============================================================================
-// Comprehensive IndexAny Tests - ARM64 NEON Optimization
-// ============================================================================
-
+// TestIndexAnyComprehensive tests IndexAny on a range of inputs that
+// exercise its various strategies, including the ARM64 NEON implementation.
 func TestIndexAnyComprehensive(t *testing.T) {
 	tests := []struct {
 		name     string

@@ -11,12 +11,11 @@ package bytealg
 func indexanyScalarLookup(s []byte, chars string) int {
 	// Build lookup table while checking for ASCII
 	var table [256]byte
-	for i := 0; i < len(chars); i++ {
-		c := chars[i]
-		if c >= 0x80 {
+	for _, b := range []byte(chars) {
+		if b >= 0x80 {
 			return -2 // Non-ASCII detected
 		}
-		table[c] = 1
+		table[b] = 1
 	}
 
 	// Search using table

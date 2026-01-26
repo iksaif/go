@@ -247,8 +247,7 @@ func IndexAny(s []byte, chars string) int {
 		return IndexRune(s, r)
 	}
 
-	// For large buffers (>=128 bytes), use architecture-specific optimizations
-	// For small buffers, use proven bitset approach to avoid any regression
+	// For large buffers, architecture-specific optimizations outperform a bit vector.
 	if len(s) >= 128 {
 		// IndexAnyASCII checks for ASCII during lookup structure build
 		// and returns -2 if non-ASCII is detected
@@ -259,7 +258,7 @@ func IndexAny(s []byte, chars string) int {
 	}
 
 	// Small buffer (<128 bytes) or non-ASCII charset
-	// Use original proven bitset approach (no regression)
+	// Use bitset approach
 	if as, isASCII := makeASCIISet(chars); isASCII {
 		for i, c := range s {
 			if as.contains(c) {
