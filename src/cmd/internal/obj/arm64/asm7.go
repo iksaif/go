@@ -3186,6 +3186,8 @@ func buildop(ctxt *obj.Link) {
 		case AVADDP:
 			oprangeset(AVAND, t)
 			oprangeset(AVCMEQ, t)
+			oprangeset(AVCMGE, t)
+			oprangeset(AVCMGT, t)
 			oprangeset(AVORR, t)
 			oprangeset(AVEOR, t)
 			oprangeset(AVBSL, t)
@@ -3224,6 +3226,7 @@ func buildop(ctxt *obj.Link) {
 
 		case AVADDV:
 			oprangeset(AVUADDLV, t)
+			oprangeset(AVUMAXV, t)
 
 		case AVFMLA:
 			oprangeset(AVFMLS, t)
@@ -6427,6 +6430,12 @@ func (c *ctxt7) oprrr(p *obj.Prog, a obj.As, rd, rn, rm int16) uint32 {
 	case AVCMEQ:
 		op = 1<<29 | 0x71<<21 | 0x23<<10
 
+	case AVCMGE:
+		op = 1<<29 | 0x71<<21 | 0x0F<<10
+
+	case AVCMGT:
+		op = 0x70<<21 | 0x0D<<10
+
 	case AVCNT:
 		op = 0xE<<24 | 0x10<<17 | 5<<12 | 2<<10
 
@@ -6466,6 +6475,9 @@ func (c *ctxt7) oprrr(p *obj.Prog, a obj.As, rd, rn, rm int16) uint32 {
 	case AVUADDLV:
 		op = 1<<29 | 7<<25 | 3<<20 | 7<<11
 
+	case AVUMAXV:
+		op = 3<<29 | 7<<25 | 3<<20 | 5<<13 | 1<<11
+
 	case AVFMLA:
 		op = 7<<25 | 0<<23 | 1<<21 | 3<<14 | 3<<10
 
@@ -6494,7 +6506,7 @@ func (c *ctxt7) oprrr(p *obj.Prog, a obj.As, rd, rn, rm int16) uint32 {
 		op = 1<<29 | 0x75<<21 | 7<<10
 
 	case AVBSL:
-		op = 1<<29 | 0x73<<21 | 7<<10
+		op = 1<<30 | 1<<29 | 0x73<<21 | 7<<10
 
 	case AVCMTST:
 		op = 0xE<<24 | 1<<21 | 0x23<<10
