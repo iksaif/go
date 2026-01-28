@@ -16,21 +16,24 @@ func IndexAnyASCII(s []byte, chars string) int {
 	}
 
 	// Adaptive strategy based on charset size
-	// Testing shows different optimal approaches for different charset sizes:
+	// Benchmarking shows optimal approaches for different charset sizes:
 	//
-	// Small charsets (2-5 bytes): NEON unrolled comparisons excel
-	// Medium charsets (6-16 bytes): Scalar lookup is faster than NEON
-	// Large charsets (17+ bytes): NEON lookup table approach
+	// Small/Medium charsets (≤16 bytes): TBL with split bitvector is fastest
+	//   - 1-byte: 13714 MB/s (2.3x faster than NEON unrolled)
+	//   - 4-byte: 13186 MB/s (4.6x faster than NEON unrolled)
+	//   - 8-byte: 12753 MB/s (4.5x faster than scalar lookup)
+	//   - 16-byte: 11848 MB/s (4.2x faster than scalar lookup)
+	//
+	// Large charsets (>16 bytes): NEON 256-byte lookup table
+	//   - 17-32 bytes: ~3000-4000 MB/s
+	//   - 62+ bytes: up to 33715 MB/s
 
-	if len(chars) <= 5 {
-		// Small charset: Use NEON unrolled comparisons
-		// Best for 2-5 byte charsets
-		return indexanyASCIINeonUnrolled(s, chars)
-	} else if len(chars) <= 16 {
-		// Medium charset: Scalar lookup is faster than NEON unrolled
-		return indexanyASCIILookup(s, chars)
+	if len(chars) <= 16 {
+		// Use TBL (Table Lookup) with split bitvector approach
+		// Fastest for all charset sizes ≤16 bytes
+		return indexanyASCIINeonTBL(s, chars)
 	} else {
-		// Large charset: Use NEON lookup table approach
+		// Large charset: Use NEON 256-byte lookup table
 		return indexanyASCIINeonLookup(s, chars)
 	}
 }
@@ -46,3 +49,9 @@ func indexanyASCIINeonUnrolled(s []byte, chars string) int
 //
 //go:noescape
 func indexanyASCIINeonLookup(s []byte, chars string) int
+
+// indexanyASCIINeonTBL is implemented in indexany_arm64.s
+// Uses NEON TBL instruction with split bitvector for charsets ≤16 bytes
+//
+//go:noescape
+func indexanyASCIINeonTBL(s []byte, chars string) int
